@@ -46,7 +46,7 @@ app.get('/ost', async (req, res) => {
         const trackName = $nameCell.text().trim();
         const downloadUrl = $downloadCell.attr('href');
         
-        if (trackName && downloadUrl && trackName.length > 1) {
+        if (trackName && downloadUrl && !trackName.includes('Track')) {
           tracks.push({
             name: trackName,
             downloadPage: `https://downloads.khinsider.com${downloadUrl}`
@@ -55,39 +55,51 @@ app.get('/ost', async (req, res) => {
       }
     });
 
-    console.log(`Found ${tracks.length} tracks, getting first audio URL...`);
+    // ✅ If no tracks found in songlist, try alternative selectors
+    if (tracks.length === 0) {
+      $album('table tr td a').each((index, element) => {
+        const href = $album(element).attr('href');
+        const text = $album(element).text().trim();
+        
+        if (href && href.includes('/game-soundtracks/') && text) {
+          tracks.push({
+            name: text,
+            downloadPage: `https://downloads.khinsider.com${href}`
+          });
+        }
+      });
+    }
 
-    // ✅ Only get the first track's audio URL
-    if (tracks.length > 0) {
-      const firstTrack = tracks[0];
+    console.log(`Found ${tracks.length} tracks, getting audio URLs...`);
+
+    // ✅ Now follow each download page to get the actual audio URL
+    const audioTracks = [];
+    for (let i = 0; i < Math.min(tracks.length, 5); i++) { // Limit to first 5 tracks
+      const track = tracks[i];
       try {
-        console.log(`Getting audio URL for: ${firstTrack.name}`);
-        const downloadPageHtml = await fetch(firstTrack.downloadPage).then(r => r.text());
+        console.log(`Getting audio URL for: ${track.name}`);
+        const downloadPageHtml = await fetch(track.downloadPage).then(r => r.text());
         const $download = cheerio.load(downloadPageHtml);
         
         // Look for direct audio file links
         const audioUrl = $download('a[href*=".mp3"], a[href*=".ogg"], a[href*=".wav"]').first().attr('href');
         
         if (audioUrl) {
-          const audioTracks = [{
-            name: firstTrack.name,
+          audioTracks.push({
+            name: track.name,
             url: `https://downloads.khinsider.com${audioUrl}`
-          }];
-          
-          console.log(`✅ Found audio URL for ${firstTrack.name}: ${audioUrl}`);
-          res.json({ tracks: audioTracks });
+          });
+          console.log(`✅ Found audio URL for ${track.name}`);
         } else {
-          console.log(`❌ No audio URL found for ${firstTrack.name}`);
-          res.status(404).json({ error: 'No audio URL found' });
+          console.log(`❌ No audio URL found for ${track.name}`);
         }
       } catch (err) {
-        console.log(`Failed to get audio URL for ${firstTrack.name}: ${err.message}`);
-        res.status(500).json({ error: 'Failed to get audio URL' });
+        console.log(`Failed to get audio URL for ${track.name}: ${err.message}`);
       }
-    } else {
-      console.log('No tracks found');
-      res.status(404).json({ error: 'No tracks found' });
     }
+
+    console.log(`Found ${audioTracks.length} audio tracks`);
+    res.json({ tracks: audioTracks });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
