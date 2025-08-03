@@ -11,6 +11,7 @@ app.get('/ping', (req, res) => {
 
 app.get('/ost', async (req, res) => {
   const game = req.query.game;
+  const trackIndex = parseInt(req.query.track || '0'); // Get track index from query
   if (!game) return res.status(400).json({ error: 'No game provided' });
 
   try {
@@ -70,44 +71,43 @@ app.get('/ost', async (req, res) => {
       });
     }
 
-    console.log(`Found ${tracks.length} tracks, getting first audio URL...`);
+    console.log(`Found ${tracks.length} tracks, getting track ${trackIndex}...`);
 
-    // ✅ Only get the first track's audio URL
-    if (tracks.length > 0) {
-      const firstTrack = tracks[0];
+    // ✅ Get the specified track's audio URL
+    if (tracks.length > trackIndex) {
+      const selectedTrack = tracks[trackIndex];
       try {
-        console.log(`Getting audio URL for: ${firstTrack.name}`);
-        const downloadPageHtml = await fetch(firstTrack.downloadPage).then(r => r.text());
+        console.log(`Getting audio URL for: ${selectedTrack.name} (Track ${trackIndex + 1}/${tracks.length})`);
+        const downloadPageHtml = await fetch(selectedTrack.downloadPage).then(r => r.text());
         const $download = cheerio.load(downloadPageHtml);
         
-        // ✅ Look for the audio player source first
-        let audioUrl = $download('audio source').first().attr('src');
-        
-        // ✅ If no player source, look for direct audio file links
-        if (!audioUrl) {
-          audioUrl = $download('a[href*=".mp3"], a[href*=".ogg"], a[href*=".wav"]').first().attr('href');
-        }
+        // Look for direct audio file links
+        const audioUrl = $download('a[href*=".mp3"], a[href*=".ogg"], a[href*=".wav"]').first().attr('href');
         
         if (audioUrl) {
           const fullAudioUrl = audioUrl.startsWith('http') ? audioUrl : `https://downloads.khinsider.com${audioUrl}`;
+          console.log(`✅ Found audio URL for ${selectedTrack.name}: ${fullAudioUrl}`);
+          
           const audioTracks = [{
-            name: firstTrack.name,
-            url: fullAudioUrl
+            name: selectedTrack.name,
+            url: fullAudioUrl,
+            trackIndex: trackIndex,
+            totalTracks: tracks.length,
+            nextTrackIndex: trackIndex + 1 < tracks.length ? trackIndex + 1 : 0 // Loop back to first track
           }];
           
-          console.log(`✅ Found audio URL for ${firstTrack.name}: ${fullAudioUrl}`);
           res.json({ tracks: audioTracks });
         } else {
-          console.log(`❌ No audio URL found for ${firstTrack.name}`);
+          console.log(`❌ No audio URL found for ${selectedTrack.name}`);
           res.status(404).json({ error: 'No audio URL found' });
         }
       } catch (err) {
-        console.log(`Failed to get audio URL for ${firstTrack.name}: ${err.message}`);
+        console.log(`Failed to get audio URL for ${selectedTrack.name}: ${err.message}`);
         res.status(500).json({ error: 'Failed to get audio URL' });
       }
     } else {
-      console.log('No tracks found');
-      res.status(404).json({ error: 'No tracks found' });
+      console.log(`Track index ${trackIndex} out of range (0-${tracks.length - 1})`);
+      res.status(404).json({ error: 'Track index out of range' });
     }
   } catch (err) {
     console.error(err);
