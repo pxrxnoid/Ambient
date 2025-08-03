@@ -7,7 +7,7 @@ const cheerio = require('cheerio');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Debug route to check server is alive
+// Debug route
 app.get('/ping', (req, res) => {
   res.json({ status: 'Proxy is alive ✅' });
 });
@@ -25,13 +25,13 @@ app.get('/ost', async (req, res) => {
     const searchHtml = await fetch(searchUrl).then(r => r.text());
     const $search = cheerio.load(searchHtml);
 
-    // Step 2: Find first album link in search table
+    // ✅ Correct selector for first album link
     let firstAlbumLink = null;
-    $search('table tr td.albumDownloadLink a').each((_, el) => {
+    $search('td.clickable-row a').each((_, el) => {
       const href = $search(el).attr('href');
       if (href && href.includes('/game-soundtracks/album/')) {
         firstAlbumLink = href;
-        return false; // stop loop
+        return false; // stop after first
       }
     });
 
@@ -40,15 +40,14 @@ app.get('/ost', async (req, res) => {
       return res.status(404).json({ error: 'No album found' });
     }
 
-    // Build full album URL
+    // Step 2: Open album page
     const albumUrl = `https://downloads.khinsider.com${firstAlbumLink}`;
     console.log(`Album URL: ${albumUrl}`);
 
-    // Step 3: Open album page
     const albumHtml = await fetch(albumUrl).then(r => r.text());
     const $album = cheerio.load(albumHtml);
 
-    // Step 4: Collect all track MP3 links
+    // Step 3: Scrape track MP3 URLs
     let tracks = [];
     $album('table tr td a').each((_, el) => {
       const href = $album(el).attr('href');
@@ -57,7 +56,7 @@ app.get('/ost', async (req, res) => {
       }
     });
 
-    // Return data
+    // Step 4: Return data
     res.json({ game, albumUrl, tracks });
   } catch (err) {
     console.error(err);
