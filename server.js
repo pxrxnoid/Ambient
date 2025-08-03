@@ -1,11 +1,3 @@
-const express = require('express');
-const fetch = require('node-fetch');
-const cheerio = require('cheerio');
-
-
-const app = express();
-const PORT = process.env.PORT || 3000;
-
 app.get('/ost', async (req, res) => {
   const game = req.query.game;
   if (!game) return res.status(400).json({ error: 'No game provided' });
@@ -32,10 +24,8 @@ app.get('/ost', async (req, res) => {
       }
     });
 
-    res.json({ game, tracks });
+    res.json({ game, searchUrl, albumUrl, tracks });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
-
-app.listen(PORT, () => console.log(`Proxy running on port ${PORT}`));
