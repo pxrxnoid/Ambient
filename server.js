@@ -46,14 +46,7 @@ app.get('/ost', async (req, res) => {
         const trackName = $nameCell.text().trim();
         const downloadUrl = $downloadCell.attr('href');
         
-        // ✅ Skip if trackName looks like duration or file size
-        if (trackName && downloadUrl && 
-            !trackName.includes('Track') && 
-            !trackName.match(/^\d+:\d+$/) && // Skip durations like "1:11"
-            !trackName.match(/^\d+\.\d+\s*MB$/) && // Skip file sizes like "1.08 MB"
-            !trackName.includes('get_app') && // Skip download buttons
-            trackName.length > 3) { // Skip very short names like "11"
-          
+        if (trackName && downloadUrl && trackName.length > 1) {
           tracks.push({
             name: trackName,
             downloadPage: `https://downloads.khinsider.com${downloadUrl}`
@@ -62,7 +55,7 @@ app.get('/ost', async (req, res) => {
       }
     });
 
-    console.log(`Found ${tracks.length} valid tracks, getting first audio URL...`);
+    console.log(`Found ${tracks.length} tracks, getting first audio URL...`);
 
     // ✅ Only get the first track's audio URL
     if (tracks.length > 0) {
@@ -92,8 +85,8 @@ app.get('/ost', async (req, res) => {
         res.status(500).json({ error: 'Failed to get audio URL' });
       }
     } else {
-      console.log('No valid tracks found');
-      res.status(404).json({ error: 'No valid tracks found' });
+      console.log('No tracks found');
+      res.status(404).json({ error: 'No tracks found' });
     }
   } catch (err) {
     console.error(err);
